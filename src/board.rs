@@ -1,4 +1,4 @@
-use std::usize;
+use std::{ops::BitXor, usize};
 
 #[derive(Debug)]
 pub struct Board {
@@ -11,6 +11,8 @@ pub struct Board {
     pub is_in_check: bool,
     pub is_game_over: bool,
     pub en_passent: EnPassant,
+    pub halfmove_clock: usize,
+    pub fullmove_number: usize,
 }
 
 #[derive(Debug)]
@@ -34,10 +36,48 @@ impl Board {
                 availabile: false,
                 target: None,
             },
+            halfmove_clock: 0,
+            fullmove_number: 1,
         };
         let default: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         board.parse_fen(default);
         board
+    }
+
+    pub fn print(&self) {
+        for x in 0..8 {
+            for y in 0..8 {
+                match self.squares[x][y] {
+                    Square::Full(Piece {
+                        Type: PieceType::Pawn,
+                        Color: PieceColor::White | PieceColor::Black,
+                    }) => print!("|p|"),
+                    Square::Full(Piece {
+                        Type: PieceType::Knight,
+                        Color: PieceColor::White | PieceColor::Black,
+                    }) => print!("|n|"),
+                    Square::Full(Piece {
+                        Type: PieceType::Bishop,
+                        Color: PieceColor::White | PieceColor::Black,
+                    }) => print!("|b|"),
+                    Square::Full(Piece {
+                        Type: PieceType::Rook,
+                        Color: PieceColor::White | PieceColor::Black,
+                    }) => print!("|r|"),
+                    Square::Full(Piece {
+                        Type: PieceType::Queen,
+                        Color: PieceColor::White | PieceColor::Black,
+                    }) => print!("|q|"),
+                    Square::Full(Piece {
+                        Type: PieceType::King,
+                        Color: PieceColor::White | PieceColor::Black,
+                    }) => print!("|k|"),
+                    Square::Empty => print!("|.|"),
+                }
+            }
+            println!();
+            print!("\n");
+        }
     }
 
     pub fn parse_fen(&mut self, fen: &str) {
@@ -51,13 +91,15 @@ impl Board {
         let side_to_move = parts[1];
         let castling_availability = parts[2];
         let en_passant_target = parts[3];
-        let halfmove_clock: u32 = parts[4].parse().expect("Invalid halfmove clock");
-        let fullmove_number: u32 = parts[5].parse().expect("Invalid fullmove number");
+        let halfmove_clock: usize = parts[4].parse().expect("Invalid halfmove clock");
+        let fullmove_number: usize = parts[5].parse().expect("Invalid fullmove number");
 
         self.parse_pieces(piece_placement);
         self.side_to_move(side_to_move);
         self.castling_availability(castling_availability);
         self.en_passant_target(en_passant_target);
+        self.halfmove_clock(halfmove_clock);
+        self.fullmove_number(fullmove_number);
     }
 
     pub fn parse_pieces(&mut self, piece_placement: &str) {
@@ -126,6 +168,14 @@ impl Board {
                 target: Some(Point { rank, file }),
             }
         }
+    }
+
+    pub fn halfmove_clock(&mut self, halfmove_clock: usize) {
+        self.halfmove_clock = halfmove_clock;
+    }
+
+    pub fn fullmove_number(&mut self, fullmove_number: usize) {
+        self.fullmove_number = fullmove_number;
     }
 
     pub fn place_square(&mut self, piece_name: char, pos: &Point) {
