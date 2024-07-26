@@ -1,8 +1,6 @@
-use std::{ops::BitXor, usize};
-
 #[derive(Debug)]
 pub struct Board {
-    pub squares: [[Square; 8]; 8],
+    pub squares: [[Option<Piece>; 8]; 8],
     pub white_k_castle: bool,
     pub white_q_castle: bool,
     pub black_k_castle: bool,
@@ -10,21 +8,15 @@ pub struct Board {
     pub white_to_move: bool,
     pub is_in_check: bool,
     pub is_game_over: bool,
-    pub en_passent: EnPassant,
+    pub en_passent: Option<Point>,
     pub halfmove_clock: usize,
     pub fullmove_number: usize,
-}
-
-#[derive(Debug)]
-pub struct EnPassant {
-    availabile: bool,
-    target: Option<Point>,
 }
 
 impl Board {
     pub fn default() -> Self {
         let mut board = Board {
-            squares: [[Square::Empty; 8]; 8],
+            squares: [[None; 8]; 8],
             white_k_castle: false,
             white_q_castle: false,
             black_k_castle: false,
@@ -32,10 +24,7 @@ impl Board {
             is_game_over: false,
             is_in_check: false,
             white_to_move: true,
-            en_passent: EnPassant {
-                availabile: false,
-                target: None,
-            },
+            en_passent: None,
             halfmove_clock: 0,
             fullmove_number: 1,
         };
@@ -48,31 +37,55 @@ impl Board {
         for x in 0..8 {
             for y in 0..8 {
                 match self.squares[x][y] {
-                    Square::Full(Piece {
+                    Some(Piece {
                         Type: PieceType::Pawn,
-                        Color: PieceColor::White | PieceColor::Black,
+                        Color: PieceColor::Black,
                     }) => print!("|p|"),
-                    Square::Full(Piece {
+                    Some(Piece {
                         Type: PieceType::Knight,
-                        Color: PieceColor::White | PieceColor::Black,
+                        Color: PieceColor::Black,
                     }) => print!("|n|"),
-                    Square::Full(Piece {
+                    Some(Piece {
                         Type: PieceType::Bishop,
-                        Color: PieceColor::White | PieceColor::Black,
+                        Color: PieceColor::Black,
                     }) => print!("|b|"),
-                    Square::Full(Piece {
+                    Some(Piece {
                         Type: PieceType::Rook,
-                        Color: PieceColor::White | PieceColor::Black,
+                        Color: PieceColor::Black,
                     }) => print!("|r|"),
-                    Square::Full(Piece {
+                    Some(Piece {
                         Type: PieceType::Queen,
-                        Color: PieceColor::White | PieceColor::Black,
+                        Color: PieceColor::Black,
                     }) => print!("|q|"),
-                    Square::Full(Piece {
+                    Some(Piece {
                         Type: PieceType::King,
-                        Color: PieceColor::White | PieceColor::Black,
+                        Color: PieceColor::Black,
                     }) => print!("|k|"),
-                    Square::Empty => print!("|.|"),
+                    Some(Piece {
+                        Type: PieceType::Pawn,
+                        Color: PieceColor::White,
+                    }) => print!("|P|"),
+                    Some(Piece {
+                        Type: PieceType::Knight,
+                        Color: PieceColor::White,
+                    }) => print!("|N|"),
+                    Some(Piece {
+                        Type: PieceType::Bishop,
+                        Color: PieceColor::White,
+                    }) => print!("|B|"),
+                    Some(Piece {
+                        Type: PieceType::Rook,
+                        Color: PieceColor::White,
+                    }) => print!("|R|"),
+                    Some(Piece {
+                        Type: PieceType::Queen,
+                        Color: PieceColor::White,
+                    }) => print!("|Q|"),
+                    Some(Piece {
+                        Type: PieceType::King,
+                        Color: PieceColor::White,
+                    }) => print!("|K|"),
+                    None => print!("|.|"),
                 }
             }
             println!();
@@ -149,10 +162,7 @@ impl Board {
 
     pub fn en_passant_target(&mut self, en_passant_target: &str) {
         if en_passant_target == "-" {
-            self.en_passent = EnPassant {
-                availabile: false,
-                target: None,
-            }
+            self.en_passent = None;
         } else {
             let rank = en_passant_target.chars().next().unwrap() as usize - 'a' as usize;
             let file = en_passant_target
@@ -163,10 +173,7 @@ impl Board {
                 .unwrap() as usize
                 - 1;
 
-            self.en_passent = EnPassant {
-                availabile: true,
-                target: Some(Point { rank, file }),
-            }
+            self.en_passent = Some(Point { rank, file });
         }
     }
 
@@ -179,41 +186,21 @@ impl Board {
     }
 
     pub fn place_square(&mut self, piece_name: char, pos: &Point) {
-        self.squares[pos.rank][pos.file] = Square::place_piece(piece_name);
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum Square {
-    Empty,
-    Full(Piece),
-}
-
-impl Square {
-    fn default() -> Square {
-        Square::Empty
-    }
-
-    fn place_piece(name: char) -> Square {
-        let pc = if name.is_uppercase() {
+        let Color = if piece_name.is_uppercase() {
             PieceColor::White
         } else {
             PieceColor::Black
         };
-        let pt = match name.to_ascii_uppercase() {
+        let Type = match piece_name.to_uppercase().next().unwrap() {
             'P' => PieceType::Pawn,
-            'R' => PieceType::Rook,
             'N' => PieceType::Knight,
             'B' => PieceType::Bishop,
+            'R' => PieceType::Rook,
             'Q' => PieceType::Queen,
             'K' => PieceType::King,
-            _ => panic!("Unknown PieceType!"),
+            _ => panic!("WRONG PIECE TYPE {piece_name}!"),
         };
-
-        Square::Full(Piece {
-            Type: pt,
-            Color: pc,
-        })
+        self.squares[pos.rank][pos.file] = Some(Piece { Type, Color });
     }
 }
 
