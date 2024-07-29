@@ -9,6 +9,37 @@ pub struct Board {
     pub fullmove_clock: u16,
 }
 
+impl std::fmt::Display for Board {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for rank in 0..8 {
+            for file in 0..8 {
+                let idx = rank * 8 + file;
+                match &self.squares[idx] {
+                    Some(piece) => {
+                        let symbol = match piece.r#type {
+                            PieceType::Pawn => 'P',
+                            PieceType::Bishop => 'B',
+                            PieceType::Knight => 'N',
+                            PieceType::Rook => 'R',
+                            PieceType::Queen => 'Q',
+                            PieceType::King => 'K',
+                        };
+                        let symbol = if piece.color == Color::Black {
+                            symbol.to_ascii_lowercase()
+                        } else {
+                            symbol
+                        };
+                        write!(f, "{} ", symbol)?;
+                    }
+                    None => write!(f, ". ")?,
+                }
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
 impl Default for Board {
     fn default() -> Board {
         let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e4 0 1";
@@ -58,33 +89,28 @@ impl Board {
                     i += piece.to_digit(10).unwrap();
                     continue;
                 }
-                match piece.to_ascii_lowercase() {
-                    'p' => {
-                        self.pieces[PieceType::Pawn as usize] |= 1 << i;
-                    }
-                    'b' => {
-                        self.pieces[PieceType::Bishop as usize] |= 1 << i;
-                    }
-                    'n' => {
-                        self.pieces[PieceType::Knight as usize] |= 1 << i;
-                    }
-                    'r' => {
-                        self.pieces[PieceType::Rook as usize] |= 1 << i;
-                    }
-                    'q' => {
-                        self.pieces[PieceType::Queen as usize] |= 1 << i;
-                    }
-                    'k' => {
-                        self.pieces[PieceType::King as usize] |= 1 << i;
-                    }
-                    _ => (),
-                }
-                if piece.is_uppercase() {
-                    self.colors[Color::White as usize] |= 1 << i;
+                let color = if piece.is_uppercase() {
+                    Color::White
                 } else {
-                    self.colors[Color::Black as usize] |= 1 << i;
-                }
+                    Color::Black
+                };
+                let piece_type = match piece.to_ascii_lowercase() {
+                    'p' => PieceType::Pawn,
+                    'b' => PieceType::Bishop,
+                    'n' => PieceType::Knight,
+                    'r' => PieceType::Rook,
+                    'q' => PieceType::Queen,
+                    'k' => PieceType::King,
+                    _ => continue, // Ignore invalid characters
+                };
 
+                self.pieces[piece_type as usize] |= 1 << i;
+                self.squares[i as usize] = Some(Piece {
+                    r#type: piece_type,
+                    color,
+                });
+
+                self.colors[color as usize] |= 1 << i;
                 i += 1;
             }
         }
@@ -102,7 +128,7 @@ impl Board {
         if castling_availablity == "KQkq" {
             self.castling_rights = CastlingRights::ALL;
             return;
-        } else if castling_availablity == "" {
+        } else if castling_availablity.is_empty() {
             self.castling_rights = CastlingRights::NONE;
             return;
         }
@@ -130,13 +156,13 @@ impl Board {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Piece {
     pub r#type: PieceType,
     pub color: Color,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum PieceType {
     Pawn,
     Bishop,
@@ -146,7 +172,7 @@ pub enum PieceType {
     King,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Color {
     White,
     Black,
@@ -183,6 +209,9 @@ pub enum Square {
 impl std::str::FromStr for Square {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() != 2 {
+            return Err(());
+        }
         match s {
             "A8" => Ok(Square::A8),
             "B8" => Ok(Square::B8),
