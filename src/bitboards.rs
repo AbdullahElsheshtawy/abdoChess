@@ -43,8 +43,7 @@ impl std::fmt::Display for Board {
 impl Default for Board {
     fn default() -> Board {
         let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e4 0 1";
-        let board = Board::from_fen(fen).unwrap();
-        board
+        Board::from_fen(fen).unwrap()
     }
 }
 
@@ -83,9 +82,9 @@ impl Board {
         // nbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
         let mut i = 0;
         let piece_row: Vec<&str> = pieces.splitn(8, '/').collect();
-        for idx in 0..8 {
+        for (idx, _) in piece_row.iter().enumerate() {
             for piece in piece_row[idx].chars() {
-                if piece.is_digit(10) {
+                if piece.is_ascii_digit() {
                     i += piece.to_digit(10).unwrap();
                     continue;
                 }
@@ -145,7 +144,7 @@ impl Board {
     fn parse_enpassant(&mut self, en_passant: &str) {
         self.en_passant = match en_passant {
             "-" => None,
-            _ => en_passant.to_uppercase().parse().ok(),
+            s => Square::from_str(s),
         };
     }
     fn parse_halfmove_clock(&mut self, halfmove_clock: &str) {
@@ -194,7 +193,7 @@ bitflags::bitflags! {
 }
 
 #[rustfmt::skip]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, num_derive::FromPrimitive)]
 pub enum Square {
     A8, B8, C8, D8, E8, F8, G8, H8,
     A7, B7, C7, D7, E7, F7, G7, H7,
@@ -206,78 +205,25 @@ pub enum Square {
     A1, B1, C1, D1, E1, F1, G1, H1,
 }
 
-impl std::str::FromStr for Square {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+use num_traits::FromPrimitive;
+impl Square {
+    fn from_str(s: &str) -> Option<Square> {
         if s.len() != 2 {
-            return Err(());
+            return None;
         }
-        match s {
-            "A8" => Ok(Square::A8),
-            "B8" => Ok(Square::B8),
-            "C8" => Ok(Square::C8),
-            "D8" => Ok(Square::D8),
-            "E8" => Ok(Square::E8),
-            "F8" => Ok(Square::F8),
-            "G8" => Ok(Square::G8),
-            "H8" => Ok(Square::H8),
-            "A7" => Ok(Square::A7),
-            "B7" => Ok(Square::B7),
-            "C7" => Ok(Square::C7),
-            "D7" => Ok(Square::D7),
-            "E7" => Ok(Square::E7),
-            "F7" => Ok(Square::F7),
-            "G7" => Ok(Square::G7),
-            "H7" => Ok(Square::H7),
-            "A6" => Ok(Square::A6),
-            "B6" => Ok(Square::B6),
-            "C6" => Ok(Square::C6),
-            "D6" => Ok(Square::D6),
-            "E6" => Ok(Square::E6),
-            "F6" => Ok(Square::F6),
-            "G6" => Ok(Square::G6),
-            "H6" => Ok(Square::H6),
-            "A5" => Ok(Square::A5),
-            "B5" => Ok(Square::B5),
-            "C5" => Ok(Square::C5),
-            "D5" => Ok(Square::D5),
-            "E5" => Ok(Square::E5),
-            "F5" => Ok(Square::F5),
-            "G5" => Ok(Square::G5),
-            "H5" => Ok(Square::H5),
-            "A4" => Ok(Square::A4),
-            "B4" => Ok(Square::B4),
-            "C4" => Ok(Square::C4),
-            "D4" => Ok(Square::D4),
-            "E4" => Ok(Square::E4),
-            "F4" => Ok(Square::F4),
-            "G4" => Ok(Square::G4),
-            "H4" => Ok(Square::H4),
-            "A3" => Ok(Square::A3),
-            "B3" => Ok(Square::B3),
-            "C3" => Ok(Square::C3),
-            "D3" => Ok(Square::D3),
-            "E3" => Ok(Square::E3),
-            "F3" => Ok(Square::F3),
-            "G3" => Ok(Square::G3),
-            "H3" => Ok(Square::H3),
-            "A2" => Ok(Square::A2),
-            "B2" => Ok(Square::B2),
-            "C2" => Ok(Square::C2),
-            "D2" => Ok(Square::D2),
-            "E2" => Ok(Square::E2),
-            "F2" => Ok(Square::F2),
-            "G2" => Ok(Square::G2),
-            "H2" => Ok(Square::H2),
-            "A1" => Ok(Square::A1),
-            "B1" => Ok(Square::B1),
-            "C1" => Ok(Square::C1),
-            "D1" => Ok(Square::D1),
-            "E1" => Ok(Square::E1),
-            "F1" => Ok(Square::F1),
-            "G1" => Ok(Square::G1),
-            "H1" => Ok(Square::H1),
-            _ => Err(()),
-        }
+
+        #[rustfmt::skip]
+        let idx: usize = match s.to_uppercase().as_str() {
+            "A8" => 0, "B8" => 1, "C8" => 2, "D8" => 3, "E8" => 4, "F8" => 5, "G8" => 6, "H8" => 7,
+            "A7" => 8, "B7" => 9, "C7" => 10, "D7" => 11, "E7" => 12, "F7" => 13, "G7" => 14, "H7" => 15,
+            "A6" => 16, "B6" => 17, "C6" => 18, "D6" => 19, "E6" => 20, "F6" => 21, "G6" => 22, "H6" => 23,
+            "A5" => 24, "B5" => 25, "C5" => 26, "D5" => 27, "E5" => 28, "F5" => 29, "G5" => 30, "H5" => 31,
+            "A4" => 32, "B4" => 33, "C4" => 34, "D4" => 35, "E4" => 36, "F4" => 37, "G4" => 38, "H4" => 39,
+            "A3" => 40, "B3" => 41, "C3" => 42, "D3" => 43, "E3" => 44, "F3" => 45, "G3" => 46, "H3" => 47,
+            "A2" => 48, "B2" => 49, "C2" => 50, "D2" => 51, "E2" => 52, "F2" => 53, "G2" => 54, "H2" => 55,
+            "A1" => 56, "B1" => 57, "C1" => 58, "D1" => 59, "E1" => 60, "F1" => 61, "G1" => 62, "H1" => 63,
+            _ => return None,
+        };
+        FromPrimitive::from_usize(idx)
     }
 }
