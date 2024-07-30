@@ -142,10 +142,7 @@ impl Board {
         }
     }
     fn parse_enpassant(&mut self, en_passant: &str) {
-        self.en_passant = match en_passant {
-            "-" => None,
-            s => Square::from_str(s),
-        };
+        self.en_passant = Square::from_str(en_passant);
     }
     fn parse_halfmove_clock(&mut self, halfmove_clock: &str) {
         self.halfmove_clock = halfmove_clock.parse().unwrap();
