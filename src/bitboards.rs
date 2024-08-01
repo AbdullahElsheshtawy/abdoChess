@@ -9,6 +9,17 @@ pub struct Board {
     pub fullmove_clock: u16,
 }
 
+pub fn print_bitboard(bitboard: &u64) {
+    for rank in 0..8 {
+        for file in 0..8 {
+            let index = rank * 8 + file;
+            let bit = (bitboard >> index) & 1;
+            print!("{} ", bit);
+        }
+        println!();
+    }
+}
+
 impl std::fmt::Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for rank in 0..8 {
