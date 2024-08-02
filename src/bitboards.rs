@@ -10,7 +10,7 @@ pub struct Board {
 }
 
 pub fn print_bitboard(bitboard: &u64) {
-    for rank in 0..8 {
+    for rank in (0..8).rev() {
         for file in 0..8 {
             let index = rank * 8 + file;
             let bit = (bitboard >> index) & 1;
@@ -22,7 +22,7 @@ pub fn print_bitboard(bitboard: &u64) {
 
 impl std::fmt::Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for rank in 0..8 {
+        for rank in (0..8).rev() {
             for file in 0..8 {
                 let idx = rank * 8 + file;
                 match &self.squares[idx] {
@@ -53,7 +53,7 @@ impl std::fmt::Display for Board {
 
 impl Default for Board {
     fn default() -> Board {
-        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e4 0 1";
+        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         Board::from_fen(fen).unwrap()
     }
 }
@@ -91,12 +91,12 @@ impl Board {
 
     fn parse_pieces(&mut self, pieces: &str) {
         // nbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
-        let mut i = 0;
         let piece_row: Vec<&str> = pieces.splitn(8, '/').collect();
-        for (idx, _) in piece_row.iter().enumerate() {
-            for piece in piece_row[idx].chars() {
+        for (rank, row) in piece_row.iter().enumerate() {
+            let mut file = 0;
+            for piece in row.chars() {
                 if piece.is_ascii_digit() {
-                    i += piece.to_digit(10).unwrap();
+                    file += piece.to_digit(10).unwrap();
                     continue;
                 }
                 let color = if piece.is_uppercase() {
@@ -114,14 +114,17 @@ impl Board {
                     _ => continue, // Ignore invalid characters
                 };
 
-                self.pieces[piece_type as usize] |= 1 << i;
-                self.squares[i as usize] = Some(Piece {
+                dbg!("{}", 63 - (rank * 8 + file as usize));
+                let bit_index: usize = 63 - (rank * 8 + file as usize);
+
+                self.pieces[piece_type as usize] |= 1 << bit_index;
+                self.squares[bit_index] = Some(Piece {
                     r#type: piece_type,
                     color,
                 });
 
-                self.colors[color as usize] |= 1 << i;
-                i += 1;
+                self.colors[color as usize] |= 1 << bit_index;
+                file += 1;
             }
         }
     }
@@ -203,17 +206,18 @@ bitflags::bitflags! {
 #[rustfmt::skip]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, num_derive::FromPrimitive)]
 pub enum Square {
-    A8, B8, C8, D8, E8, F8, G8, H8,
-    A7, B7, C7, D7, E7, F7, G7, H7,
-    A6, B6, C6, D6, E6, F6, G6, H6,
-    A5, B5, C5, D5, E5, F5, G5, H5,
-    A4, B4, C4, D4, E4, F4, G4, H4,
-    A3, B3, C3, D3, E3, F3, G3, H3,
-    A2, B2, C2, D2, E2, F2, G2, H2,
     A1, B1, C1, D1, E1, F1, G1, H1,
+    A2, B2, C2, D2, E2, F2, G2, H2,
+    A3, B3, C3, D3, E3, F3, G3, H3,
+    A4, B4, C4, D4, E4, F4, G4, H4,
+    A5, B5, C5, D5, E5, F5, G5, H5,
+    A6, B6, C6, D6, E6, F6, G6, H6,
+    A7, B7, C7, D7, E7, F7, G7, H7,
+    A8, B8, C8, D8, E8, F8, G8, H8,
 }
 
 use num_traits::FromPrimitive;
+
 impl Square {
     fn from_str(s: &str) -> Option<Square> {
         if s.len() != 2 {
@@ -221,15 +225,15 @@ impl Square {
         }
 
         #[rustfmt::skip]
-        let idx: usize = match s.to_uppercase().as_str() {
-            "A8" => 0, "B8" => 1, "C8" => 2, "D8" => 3, "E8" => 4, "F8" => 5, "G8" => 6, "H8" => 7,
-            "A7" => 8, "B7" => 9, "C7" => 10, "D7" => 11, "E7" => 12, "F7" => 13, "G7" => 14, "H7" => 15,
-            "A6" => 16, "B6" => 17, "C6" => 18, "D6" => 19, "E6" => 20, "F6" => 21, "G6" => 22, "H6" => 23,
-            "A5" => 24, "B5" => 25, "C5" => 26, "D5" => 27, "E5" => 28, "F5" => 29, "G5" => 30, "H5" => 31,
-            "A4" => 32, "B4" => 33, "C4" => 34, "D4" => 35, "E4" => 36, "F4" => 37, "G4" => 38, "H4" => 39,
-            "A3" => 40, "B3" => 41, "C3" => 42, "D3" => 43, "E3" => 44, "F3" => 45, "G3" => 46, "H3" => 47,
-            "A2" => 48, "B2" => 49, "C2" => 50, "D2" => 51, "E2" => 52, "F2" => 53, "G2" => 54, "H2" => 55,
-            "A1" => 56, "B1" => 57, "C1" => 58, "D1" => 59, "E1" => 60, "F1" => 61, "G1" => 62, "H1" => 63,
+        let idx: usize = match s.to_lowercase().as_str() {
+            "a1" => 0, "b1" => 1, "c1" => 2, "d1" => 3, "e1" => 4, "f1" => 5, "g1" => 6, "h1" => 7,
+            "a2" => 8, "b2" => 9, "c2" => 10, "d2" => 11, "e2" => 12, "f2" => 13, "g2" => 14, "h2" => 15,
+            "a3" => 16, "b3" => 17, "c3" => 18, "d3" => 19, "e3" => 20, "f3" => 21, "g3" => 22, "h3" => 23,
+            "a4" => 24, "b4" => 25, "c4" => 26, "d4" => 27, "e4" => 28, "f4" => 29, "g4" => 30, "h4" => 31,
+            "a5" => 32, "b5" => 33, "c5" => 34, "d5" => 35, "e5" => 36, "f5" => 37, "g5" => 38, "h5" => 39,
+            "a6" => 40, "b6" => 41, "c6" => 42, "d6" => 43, "e6" => 44, "f6" => 45, "g6" => 46, "h6" => 47,
+            "a7" => 48, "b7" => 49, "c7" => 50, "d7" => 51, "e7" => 52, "f7" => 53, "g7" => 54, "h7" => 55,
+            "a8" => 56, "b8" => 57, "c8" => 58, "d8" => 59, "e8" => 60, "f8" => 61, "g8" => 62, "h8" => 63,
             _ => return None,
         };
         FromPrimitive::from_usize(idx)
