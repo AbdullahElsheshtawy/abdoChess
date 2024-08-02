@@ -185,10 +185,10 @@ mod test {
         // For white pawns, the double push moves pawns from the second rank to the fourth rank
         let expected_white_double_push: u64 = 0x00000000FF000000;
         // For black pawns, the double push moves pawns from the seventh rank to the fifth rank
-        let expected_black_double_push: u64 = 0x00FF000000000000;
+        let expected_black_double_push: u64 = 0x000000FF00000000;
 
         // Assertions to check if the results match the expected values
         assert_eq!(white_double_push, expected_white_double_push);
-        // assert_eq!(black_double_push, expected_black_double_push);
+        assert_eq!(black_double_push, expected_black_double_push);
     }
 }
