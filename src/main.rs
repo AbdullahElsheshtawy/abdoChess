@@ -1,13 +1,12 @@
 mod bitboards;
 mod movegen;
 
-use bitboards::print_bitboard;
-use bitboards::{Color, Square};
-use movegen::init_lookups;
+use bitboards::{print_bitboard, Color, Square};
+use movegen::{bishop_attack_mask, bishop_mask, rook_mask, LookUp};
 fn main() {
     let board = bitboards::Board::default();
     println!("{}", board);
 
-    let lookup = init_lookups();
-    print_bitboard(&lookup.double_pawn_attacks[Color::Black as usize][Square::A7 as usize]);
+    let lookup = LookUp::init();
+    print_bitboard(&bishop_attack_mask(Square::E4 as usize, board.pieces[0]));
 }
