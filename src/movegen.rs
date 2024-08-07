@@ -1,3 +1,4 @@
+use num_traits::PrimInt;
 use rand::{Rng, SeedableRng};
 
 use crate::bitboards::Color;
@@ -405,9 +406,6 @@ pub fn bishop_attacks(square: u64, block: u64) -> u64 {
     // Diagonal moves - Up-right
     for (r, f) in (rank + 1..8).zip(file + 1..8) {
         let pos = f + r * 8;
-        if pos >= 64 {
-            break;
-        }
         attacks |= 1u64 << pos;
         if block & (1u64 << pos) != 0 {
             break;
@@ -417,9 +415,6 @@ pub fn bishop_attacks(square: u64, block: u64) -> u64 {
     // Diagonal moves - Up-left
     for (r, f) in (rank + 1..8).zip((0..file).rev()) {
         let pos = f + r * 8;
-        if pos >= 64 {
-            break;
-        }
         attacks |= 1u64 << pos;
         if block & (1u64 << pos) != 0 {
             break;
@@ -429,9 +424,6 @@ pub fn bishop_attacks(square: u64, block: u64) -> u64 {
     // Diagonal moves - Down-right
     for (r, f) in (0..rank).rev().zip(file + 1..8) {
         let pos = f + r * 8;
-        if pos >= 64 {
-            break;
-        }
         attacks |= 1u64 << pos;
         if block & (1u64 << pos) != 0 {
             break;
@@ -441,9 +433,6 @@ pub fn bishop_attacks(square: u64, block: u64) -> u64 {
     // Diagonal moves - Down-left
     for (r, f) in (0..rank).rev().zip((0..file).rev()) {
         let pos = f + r * 8;
-        if pos >= 64 {
-            break;
-        }
         attacks |= 1u64 << pos;
         if block & (1u64 << pos) != 0 {
             break;
@@ -452,67 +441,6 @@ pub fn bishop_attacks(square: u64, block: u64) -> u64 {
 
     attacks
 }
-
-// pub fn bishop_attacks(square: u64, block: u64) -> u64 {
-//     let mut attacks: u64 = 0;
-//     let rank = square / 8;
-//     let file = square % 8;
-//
-//     // Diagonal moves - Up-right
-//     let mut r = rank + 1;
-//     let mut f = file + 1;
-//     while r < 8 && f < 8 {
-//         let pos = f + r * 8;
-//         attacks |= 1u64 << pos;
-//         if block & (1u64 << pos) != 0 {
-//             break;
-//         }
-//         r += 1;
-//         f += 1;
-//     }
-//
-//     // Diagonal moves - Up-left
-//     let mut r = rank + 1;
-//     let mut f = file as isize - 1;
-//     while r < 8 && f >= 0 {
-//         let pos = f as u64 + r * 8;
-//         attacks |= 1u64 << pos;
-//         if block & (1u64 << pos) != 0 {
-//             break;
-//         }
-//         r += 1;
-//         f -= 1;
-//     }
-//
-//     // Diagonal moves - Down-right
-//     let mut r = rank as isize - 1;
-//     let mut f = file + 1;
-//     while r >= 0 && f < 8 {
-//         let pos = f + r as u64 * 8;
-//         attacks |= 1u64 << pos;
-//         if block & (1u64 << pos) != 0 {
-//             break;
-//         }
-//         r -= 1;
-//         f += 1;
-//     }
-//
-//     // Diagonal moves - Down-left
-//     let mut r = rank as isize - 1;
-//     let mut f = file as isize - 1;
-//     while r >= 0 && f >= 0 {
-//         let pos = f as u64 + r as u64 * 8;
-//         attacks |= 1u64 << pos;
-//         if block & (1u64 << pos) != 0 {
-//             break;
-//         }
-//         r -= 1;
-//         f -= 1;
-//     }
-//
-//     attacks
-// }
-//
 pub fn w_pawn_east_attacks(wpawns: u64) -> u64 {
     no_ea_one(wpawns)
 }
