@@ -1,3 +1,5 @@
+use rand::{Rng, SeedableRng};
+
 use crate::bitboards::Color;
 const NOT_A_FILE: u64 = 0xfefefefefefefefe; // ~0x0101010101010101
 const NOT_H_FILE: u64 = 0x7f7f7f7f7f7f7f7f; // ~0x8080808080808080
@@ -30,6 +32,8 @@ pub struct LookUp {
     pub king_attacks: [u64; 64],
     pub knight_attacks: [u64; 64],
     pub pawn_attacks: [[u64; 64]; 2],
+    pub bishop_attacks: [[u64; 64]; 64],
+    pub rook_attacks: [[u64; 64]; 64],
 }
 
 impl LookUp {
@@ -37,6 +41,9 @@ impl LookUp {
         let mut king_attacks_mask: [u64; 64] = [0; 64];
         let mut knight_attacks_mask: [u64; 64] = [0; 64];
         let mut pawn_attacks_mask: [[u64; 64]; 2] = [[0; 64]; 2];
+        let mut bishop_attacks_mask: [[u64; 64]; 64] = [[0; 64]; 64];
+        let mut rook_attacks_mask: [[u64; 64]; 64] = [[0; 64]; 64];
+
         let mut sq_bb: u64 = 1;
         for sq in 0..64 {
             king_attacks_mask[sq] = king_attacks(sq_bb);
@@ -45,6 +52,15 @@ impl LookUp {
             let black_attacks = b_pawn_east_attacks(sq_bb) | b_pawn_west_attacks(sq_bb);
             pawn_attacks_mask[Color::White as usize][sq] = white_attacks;
             pawn_attacks_mask[Color::Black as usize][sq] = black_attacks;
+
+            for i in 0..64 {
+                let magic = find_magic(sq_bb, BISHOP_BITS[sq], true);
+                bishop_attacks_mask[sq][i] =
+                    transform(bishop_attacks(sq_bb, i as u64), magic, BISHOP_BITS[sq]);
+                let magic = find_magic(sq_bb, ROOK_BITS[sq], false);
+                rook_attacks_mask[sq][i] =
+                    transform(rook_attacks(sq_bb, i as u64), magic, ROOK_BITS[sq]);
+            }
             sq_bb <<= 1;
         }
 
@@ -52,48 +68,46 @@ impl LookUp {
             king_attacks: king_attacks_mask,
             knight_attacks: knight_attacks_mask,
             pawn_attacks: pawn_attacks_mask,
+            bishop_attacks: bishop_attacks_mask,
+            rook_attacks: rook_attacks_mask,
         }
     }
 }
+use rand_xoshiro::Xoshiro256PlusPlus;
 
 pub fn find_magic(square: u64, mask_bits: u64, is_bishop: bool) -> u64 {
-    let mut occupancy_variations = [0u64; 4096];
-    let mut attack_masks = [0u64; 4096];
-    let mut used_attacks = [0u64; 4096];
-    let mut magic: u64;
-    let mut fail: bool;
-
     let mask: u64 = if is_bishop {
         bishop_mask(square)
     } else {
         rook_mask(square)
     };
-    let occupancy_count = count_1s(mask);
+    let occupancy_count = mask.count_ones() as u64;
+    let occupation_indices = 1 << occupancy_count;
+    let mut rng = Xoshiro256PlusPlus::seed_from_u64(square);
 
-    for i in 0..(1 << occupancy_count) {
-        occupancy_variations[i] = index_to_u64(i as u64, occupancy_count, mask);
-        attack_masks[i] = if is_bishop {
-            bishop_attacks(square, occupancy_variations[i])
-        } else {
-            rook_attacks(square, occupancy_variations[i])
-        };
-    }
-
-    for _ in 0..1_000_000_000 {
-        magic = random_u64_few_bits();
-
-        if count_1s(mask.wrapping_mul(magic) & 0xFF00000000000000) < 6 {
+    // Iterate with a larger number of attempts for more robust results
+    for attempt in 0..1_000_000_000_000 as i64 {
+        let magic = random_magic_number(&mut rng);
+        // Ensure the magic number has enough leading zero bits
+        if (mask.wrapping_mul(magic) & 0xFF00000000000000).count_ones() < 6 {
             continue;
         }
 
-        used_attacks.iter_mut().for_each(|x| *x = 0);
+        let mut used_attacks = vec![0u64; 1 << mask_bits];
+        let mut fail = false;
 
-        fail = false;
-        for i in 0..(1 << occupancy_count) {
-            let transformed_index = transform(occupancy_variations[i], magic, mask_bits) as usize;
-            if used_attacks[transformed_index] == 0 {
-                used_attacks[i] = attack_masks[i];
-            } else if used_attacks[transformed_index] != attack_masks[i] {
+        for i in 0..occupation_indices {
+            let occupancy = index_to_u64(i, occupancy_count, mask);
+            let attacks = if is_bishop {
+                bishop_attacks(square, occupancy)
+            } else {
+                rook_attacks(square, occupancy)
+            };
+            let index = transform(occupancy, magic, mask_bits) as usize;
+
+            if used_attacks[index] == 0 {
+                used_attacks[index] = attacks;
+            } else if used_attacks[index] != attacks {
                 fail = true;
                 break;
             }
@@ -104,10 +118,19 @@ pub fn find_magic(square: u64, mask_bits: u64, is_bishop: bool) -> u64 {
         }
     }
 
-    eprintln!("MAGIC NUMBER FAILLEED");
+    eprintln!("MAGIC NUMBER FAILED for square {}", square.trailing_zeros());
     0
 }
 
+fn random_magic_number(rng: &mut Xoshiro256PlusPlus) -> u64 {
+    let u1 = rng.gen::<u64>() & 0xFFFF;
+    let u2 = rng.gen::<u64>() & 0xFFFF;
+    let u3 = rng.gen::<u64>() & 0xFFFF;
+    let u4 = rng.gen::<u64>() & 0xFFFF;
+    u1 | (u2 << 16) | (u3 << 32) | (u4 << 48)
+}
+
+#[inline(always)]
 pub fn transform(occupancy: u64, magic: u64, bits: u64) -> u64 {
     (occupancy.wrapping_mul(magic)) >> (64 - bits)
 }
@@ -128,8 +151,8 @@ pub fn index_to_u64(index: u64, bits: u64, mask: u64) -> u64 {
 }
 pub fn rook_mask(square: u64) -> u64 {
     let mut attacks: u64 = 0;
-    let rk = square / 8;
-    let fl = square % 8;
+    let rk = (square.trailing_zeros() / 8) as u64;
+    let fl = (square.trailing_zeros() % 8) as u64;
 
     // North Movement
     let mut r = rk + 1;
@@ -175,13 +198,15 @@ pub fn random_u64() -> u64 {
 pub fn random_u64_few_bits() -> u64 {
     random_u64() & random_u64() & random_u64()
 }
+
 pub fn rook_attacks(square: u64, block: u64) -> u64 {
     let mut result: u64 = 0;
-    let rank = square / 8;
-    let file = square % 8;
+    let sq_index = square.trailing_zeros() as usize;
+    let rank = sq_index / 8;
+    let file = sq_index % 8;
 
     // Vertical moves - Up
-    for r in (rank + 1)..8 {
+    for r in rank + 1..8 {
         let pos = file + r * 8;
         result |= 1u64 << pos;
         if block & (1u64 << pos) != 0 {
@@ -199,7 +224,7 @@ pub fn rook_attacks(square: u64, block: u64) -> u64 {
     }
 
     // Horizontal moves - Right
-    for f in (file + 1)..8 {
+    for f in file + 1..8 {
         let pos = f + rank * 8;
         result |= 1u64 << pos;
         if block & (1u64 << pos) != 0 {
@@ -220,8 +245,8 @@ pub fn rook_attacks(square: u64, block: u64) -> u64 {
 }
 pub fn bishop_mask(square: u64) -> u64 {
     let mut attacks: u64 = 0;
-    let rk = square / 8;
-    let fl = square % 8;
+    let rk = (square.trailing_zeros() / 8) as u64;
+    let fl = (square.trailing_zeros() % 8) as u64;
 
     // North East Movement
     let mut r: isize = rk as isize + 1;
@@ -244,12 +269,9 @@ pub fn bishop_mask(square: u64) -> u64 {
     // South East Movement
     r = rk as isize - 1;
     f = fl as isize + 1;
-    while r >= 1 && f <= 6 {
-        attacks |= 1u64 << ((f as u64 + r as u64) * 8);
-        r -= 1;
-        f += 1;
+    for (r, f) in (1..rk).rev().zip(fl + 1..7) {
+        attacks |= 1u64 << (f + r * 8);
     }
-
     // South West Movement
     r = rk as isize - 1;
     f = fl as isize - 1;
@@ -260,67 +282,109 @@ pub fn bishop_mask(square: u64) -> u64 {
     }
     attacks
 }
-
 pub fn bishop_attacks(square: u64, block: u64) -> u64 {
     let mut attacks: u64 = 0;
-    let rank = square / 8;
-    let file = square % 8;
+    let rank = square.trailing_zeros() / 8;
+    let file = square.trailing_zeros() % 8;
 
     // Diagonal moves - Up-right
-    let mut r = rank + 1;
-    let mut f = file + 1;
-    while r < 8 && f < 8 {
+    for (r, f) in (rank + 1..8).zip(file + 1..8) {
         let pos = f + r * 8;
         attacks |= 1u64 << pos;
         if block & (1u64 << pos) != 0 {
             break;
         }
-        r += 1;
-        f += 1;
     }
 
     // Diagonal moves - Up-left
-    let mut r = rank + 1;
-    let mut f = file as isize - 1;
-    while r < 8 && f >= 0 {
-        let pos = f as u64 + r * 8;
+    for (r, f) in (rank + 1..8).zip((0..file).rev()) {
+        let pos = f + r * 8;
         attacks |= 1u64 << pos;
         if block & (1u64 << pos) != 0 {
             break;
         }
-        r += 1;
-        f -= 1;
     }
 
     // Diagonal moves - Down-right
-    let mut r = rank as isize - 1;
-    let mut f = file + 1;
-    while r >= 0 && f < 8 {
-        let pos = f + r as u64 * 8;
+    for (r, f) in (0..rank).rev().zip(file + 1..8) {
+        let pos = f + r * 8;
         attacks |= 1u64 << pos;
         if block & (1u64 << pos) != 0 {
             break;
         }
-        r -= 1;
-        f += 1;
     }
 
     // Diagonal moves - Down-left
-    let mut r = rank as isize - 1;
-    let mut f = file as isize - 1;
-    while r >= 0 && f >= 0 {
-        let pos = f as u64 + r as u64 * 8;
+    for (r, f) in (0..rank).rev().zip((0..file).rev()) {
+        let pos = f + r * 8;
         attacks |= 1u64 << pos;
         if block & (1u64 << pos) != 0 {
             break;
         }
-        r -= 1;
-        f -= 1;
     }
 
     attacks
 }
-
+// pub fn bishop_attacks(square: u64, block: u64) -> u64 {
+//     let mut attacks: u64 = 0;
+//     let rank = square / 8;
+//     let file = square % 8;
+//
+//     // Diagonal moves - Up-right
+//     let mut r = rank + 1;
+//     let mut f = file + 1;
+//     while r < 8 && f < 8 {
+//         let pos = f + r * 8;
+//         attacks |= 1u64 << pos;
+//         if block & (1u64 << pos) != 0 {
+//             break;
+//         }
+//         r += 1;
+//         f += 1;
+//     }
+//
+//     // Diagonal moves - Up-left
+//     let mut r = rank + 1;
+//     let mut f = file as isize - 1;
+//     while r < 8 && f >= 0 {
+//         let pos = f as u64 + r * 8;
+//         attacks |= 1u64 << pos;
+//         if block & (1u64 << pos) != 0 {
+//             break;
+//         }
+//         r += 1;
+//         f -= 1;
+//     }
+//
+//     // Diagonal moves - Down-right
+//     let mut r = rank as isize - 1;
+//     let mut f = file + 1;
+//     while r >= 0 && f < 8 {
+//         let pos = f + r as u64 * 8;
+//         attacks |= 1u64 << pos;
+//         if block & (1u64 << pos) != 0 {
+//             break;
+//         }
+//         r -= 1;
+//         f += 1;
+//     }
+//
+//     // Diagonal moves - Down-left
+//     let mut r = rank as isize - 1;
+//     let mut f = file as isize - 1;
+//     while r >= 0 && f >= 0 {
+//         let pos = f as u64 + r as u64 * 8;
+//         attacks |= 1u64 << pos;
+//         if block & (1u64 << pos) != 0 {
+//             break;
+//         }
+//         r -= 1;
+//         f -= 1;
+//     }
+//
+//     attacks
+// }
+//
 pub fn w_pawn_east_attacks(wpawns: u64) -> u64 {
     no_ea_one(wpawns)
 }

@@ -114,7 +114,6 @@ impl Board {
                     _ => continue, // Ignore invalid characters
                 };
 
-                dbg!("{}", 63 - (rank * 8 + file as usize));
                 let bit_index: usize = 63 - (rank * 8 + file as usize);
 
                 self.pieces[piece_type as usize] |= 1 << bit_index;
